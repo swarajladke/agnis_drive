@@ -132,7 +132,8 @@ export const getCurrentUser = async () => {
     if (user.total === 0) return null;
 
     return parseStringify(user.documents[0]);
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.message === "No session") return null;
     console.log("Get current user error:", error);
     return null;
   }

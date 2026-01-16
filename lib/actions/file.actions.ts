@@ -3,7 +3,7 @@
 import { createAdminClient, createSessionClient } from "@/lib/appwrite";
 import { InputFile } from "node-appwrite/file";
 import { appwriteConfig } from "@/lib/appwrite/config";
-import { ID, Models, Query } from "node-appwrite";
+import { ID, Models, Query, Permission, Role } from "node-appwrite";
 import { constructFileUrl, getFileType, parseStringify } from "@/lib/utils";
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/actions/user.actions";
@@ -13,21 +13,27 @@ const handleError = (error: unknown, message: string) => {
   throw error;
 };
 
-export const uploadFile = async ({
-  file,
-  ownerId,
-  accountId,
-  path,
-}: UploadFileProps) => {
+export const uploadFile = async (formData: FormData) => {
   const { storage, databases } = await createAdminClient();
 
   try {
+    const file = formData.get("file") as File;
+    const ownerId = formData.get("ownerId") as string;
+    const accountId = formData.get("accountId") as string;
+    const path = formData.get("path") as string;
+
     const inputFile = InputFile.fromBuffer(file, file.name);
 
     const bucketFile = await storage.createFile(
       appwriteConfig.bucketId,
       ID.unique(),
       inputFile,
+      [
+        Permission.read(Role.user(accountId)),
+        Permission.write(Role.user(accountId)),
+        Permission.update(Role.user(accountId)),
+        Permission.delete(Role.user(accountId)),
+      ],
     );
 
     const fileDocument = {
@@ -101,7 +107,7 @@ export const getFiles = async ({
   try {
     const currentUser = await getCurrentUser();
 
-    if (!currentUser) throw new Error("User not found");
+    if (!currentUser) return { total: 0, documents: [] };
 
     const queries = createQueries(currentUser, types, searchText, sort, limit);
 
@@ -198,7 +204,17 @@ export async function getTotalSpaceUsed() {
   try {
     const { databases } = await createSessionClient();
     const currentUser = await getCurrentUser();
-    if (!currentUser) throw new Error("User is not authenticated.");
+    if (!currentUser) {
+      return {
+        image: { size: 0, latestDate: "" },
+        document: { size: 0, latestDate: "" },
+        video: { size: 0, latestDate: "" },
+        audio: { size: 0, latestDate: "" },
+        other: { size: 0, latestDate: "" },
+        used: 0,
+        all: 2 * 1024 * 1024 * 1024,
+      };
+    }
 
     const files = await databases.listDocuments(
       appwriteConfig.databaseId,
