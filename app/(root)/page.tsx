@@ -8,10 +8,15 @@ import { FormattedDateTime } from "@/components/FormattedDateTime";
 import { Thumbnail } from "@/components/Thumbnail";
 import { Separator } from "@/components/ui/separator";
 import SummaryCard from "@/components/SummaryCard";
+import { convertFileSize, getUsageSummary, constructProxyUrl } from "@/lib/utils";
 import { getFiles, getTotalSpaceUsed } from "@/lib/actions/file.actions";
-import { convertFileSize, getUsageSummary } from "@/lib/utils";
+
+import { getCurrentUser } from "@/lib/actions/user.actions";
+import { redirect } from "next/navigation";
 
 const Dashboard = async () => {
+  const currentUser = await getCurrentUser();
+  if (!currentUser) redirect("/sign-in");
   // Parallel requests
   const [files, totalSpace] = await Promise.all([
     getFiles({ types: [], limit: 10 }),
@@ -41,7 +46,7 @@ const Dashboard = async () => {
           <ul className="mt-5 flex flex-col gap-5">
             {files.documents.map((file: Models.Document) => (
               <Link
-                href={file.url}
+                href={constructProxyUrl(file.bucketFileId)}
                 target="_blank"
                 className="flex items-center gap-3"
                 key={file.$id}
@@ -49,7 +54,7 @@ const Dashboard = async () => {
                 <Thumbnail
                   type={file.type}
                   extension={file.extension}
-                  url={file.url}
+                  url={constructProxyUrl(file.bucketFileId)}
                 />
 
                 <div className="recent-file-details">
